@@ -3,9 +3,15 @@ import threading
 import struct
 import os
 import tkinter as tk
-from tkinter import scrolledtext
+from tkinter import ttk, scrolledtext, filedialog, messagebox
 from datetime import datetime
 from pathlib import Path
+
+try:
+    from PIL import Image, ImageTk
+    PIL_AVAILABLE = True
+except ImportError:
+    PIL_AVAILABLE = False
 
 HOST = "0.0.0.0"
 PORT = 5000
@@ -75,48 +81,7 @@ class ChatServer:
     # ── UI construction ───────────────────────────────────────────────────────
 
     def _build_ui(self):
-        # LEFT panel
-        left = tk.Frame(self.root, bg=self.PANEL_BG, width=220)
-        left.pack(side=tk.LEFT, fill=tk.Y, padx=(8, 0), pady=8)
-        left.pack_propagate(False)
-
-        tk.Label(left, text="Clientes Conectados", bg=self.PANEL_BG,
-                 fg=self.ACCENT, font=("Consolas", 11, "bold"),
-                 pady=10).pack(fill=tk.X)
-        tk.Frame(left, bg=self.ACCENT, height=1).pack(fill=tk.X, padx=4)
-
-        self.lista_clientes = tk.Listbox(
-            left, bg="#0f3460", fg=self.FG,
-            selectbackground=self.ACCENT, selectforeground="#000000",
-            font=("Consolas", 10), bd=0, highlightthickness=0, relief=tk.FLAT
-        )
-        self.lista_clientes.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
-
-        # CENTER panel
-        center = tk.Frame(self.root, bg=self.BG)
-        center.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=8, pady=8)
-
-        tk.Label(center, text="Log del Servidor", bg=self.BG,
-                 fg=self.ACCENT, font=("Consolas", 11, "bold"),
-                 pady=6).pack(fill=tk.X)
-        tk.Frame(center, bg=self.ACCENT, height=1).pack(fill=tk.X)
-
-        self.log = scrolledtext.ScrolledText(
-            center, bg="#0f0f23", fg=self.FG, insertbackground=self.ACCENT,
-            font=("Consolas", 10), bd=0, relief=tk.FLAT,
-            state=tk.DISABLED, wrap=tk.WORD
-        )
-        self.log.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
-
-        self.log.tag_config("join",  foreground="#00ff88")
-        self.log.tag_config("leave", foreground="#ff4444")
-        self.log.tag_config("msg",   foreground="#ffffff")
-        self.log.tag_config("img",   foreground="#00d4ff")
-        self.log.tag_config("err",   foreground="#ffaa00")
-        self.log.tag_config("sys",   foreground="#aaaaaa")
-        self.log.tag_config("time",  foreground="#555577")
-
-        # BOTTOM bar
+        # BOTTOM bar — must be packed BEFORE expand=True widgets
         bottom = tk.Frame(self.root, bg=self.PANEL_BG, height=44)
         bottom.pack(side=tk.BOTTOM, fill=tk.X, padx=8, pady=(0, 8))
         bottom.pack_propagate(False)
@@ -154,6 +119,83 @@ class ChatServer:
             cursor="hand2", command=self.iniciar_servidor
         )
         self.btn_start.pack(side=tk.RIGHT, padx=4, pady=6)
+
+        # LEFT panel
+        left = tk.Frame(self.root, bg=self.PANEL_BG, width=220)
+        left.pack(side=tk.LEFT, fill=tk.Y, padx=(8, 0), pady=8)
+        left.pack_propagate(False)
+
+        tk.Label(left, text="Clientes Conectados", bg=self.PANEL_BG,
+                 fg=self.ACCENT, font=("Consolas", 11, "bold"),
+                 pady=10).pack(fill=tk.X)
+        tk.Frame(left, bg=self.ACCENT, height=1).pack(fill=tk.X, padx=4)
+
+        self.lista_clientes = tk.Listbox(
+            left, bg="#0f3460", fg=self.FG,
+            selectbackground=self.ACCENT, selectforeground="#000000",
+            font=("Consolas", 10), bd=0, highlightthickness=0, relief=tk.FLAT
+        )
+        self.lista_clientes.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+
+        # CENTER panel
+        center = tk.Frame(self.root, bg=self.BG)
+        center.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=8, pady=8)
+
+        tk.Label(center, text="Log del Servidor", bg=self.BG,
+                 fg=self.ACCENT, font=("Consolas", 11, "bold"),
+                 pady=6).pack(fill=tk.X)
+        tk.Frame(center, bg=self.ACCENT, height=1).pack(fill=tk.X)
+
+        # Input bar — packed BEFORE log so it isn't squeezed out
+        input_bar = tk.Frame(center, bg=self.PANEL_BG, height=48)
+        input_bar.pack(side=tk.BOTTOM, fill=tk.X, pady=(4, 0))
+        input_bar.pack_propagate(False)
+
+        self.btn_srv_img = tk.Button(
+            input_bar, text="Imagen",
+            bg="#0d4f3c", fg=self.FG, font=("Consolas", 9, "bold"),
+            bd=0, padx=10,
+            activebackground="#1a7a5e", activeforeground=self.FG,
+            cursor="hand2", state=tk.DISABLED,
+            command=self._enviar_imagen
+        )
+        self.btn_srv_img.pack(side=tk.RIGHT, padx=4, pady=10)
+
+        self.btn_srv_send = tk.Button(
+            input_bar, text="Enviar",
+            bg="#0d3f8a", fg=self.FG, font=("Consolas", 9, "bold"),
+            bd=0, padx=14,
+            activebackground="#1a5fcc", activeforeground=self.FG,
+            cursor="hand2", state=tk.DISABLED,
+            command=self._enviar_texto
+        )
+        self.btn_srv_send.pack(side=tk.RIGHT, padx=4, pady=10)
+
+        self.entry_srv = tk.Entry(
+            input_bar, bg="#0f3460", fg=self.FG,
+            insertbackground=self.ACCENT,
+            font=("Consolas", 11), relief=tk.FLAT, bd=4,
+            state=tk.DISABLED
+        )
+        self.entry_srv.pack(side=tk.LEFT, fill=tk.X, expand=True,
+                            padx=8, pady=10, ipady=4)
+        self.entry_srv.bind("<Return>", lambda _e: self._enviar_texto())
+
+        self.log = scrolledtext.ScrolledText(
+            center, bg="#0f0f23", fg=self.FG, insertbackground=self.ACCENT,
+            font=("Consolas", 10), bd=0, relief=tk.FLAT,
+            state=tk.DISABLED, wrap=tk.WORD
+        )
+        self.log.pack(fill=tk.BOTH, expand=True, pady=(4, 0))
+
+        self.log.tag_config("join",  foreground="#00ff88")
+        self.log.tag_config("leave", foreground="#ff4444")
+        self.log.tag_config("msg",   foreground="#ffffff")
+        self.log.tag_config("img",   foreground="#00d4ff")
+        self.log.tag_config("err",   foreground="#ffaa00")
+        self.log.tag_config("sys",   foreground="#aaaaaa")
+        self.log.tag_config("time",  foreground="#555577")
+        self.log.tag_config("srv",   foreground="#ffd700")
 
     # ── Logging (thread-safe via root.after) ──────────────────────────────────
 
@@ -286,12 +328,19 @@ class ChatServer:
             self.servidor_socket.setsockopt(
                 socket.SOL_SOCKET, socket.SO_REUSEADDR, 1
             )
+            if hasattr(socket, "SO_REUSEPORT"):
+                self.servidor_socket.setsockopt(
+                    socket.SOL_SOCKET, socket.SO_REUSEPORT, 1
+                )
             self.servidor_socket.bind((HOST, PORT))
             self.servidor_socket.listen()
             self.corriendo = True
             self._log(f"Servidor escuchando en {HOST}:{PORT}", "sys")
             self.btn_start.config(state=tk.DISABLED)
             self.btn_stop.config(state=tk.NORMAL)
+            self.entry_srv.config(state=tk.NORMAL)
+            self.btn_srv_send.config(state=tk.NORMAL)
+            self.btn_srv_img.config(state=tk.NORMAL)
             threading.Thread(target=self._aceptar_clientes, daemon=True).start()
         except Exception as e:
             self._log(f"Error al iniciar: {e}", "err")
@@ -299,6 +348,10 @@ class ChatServer:
     def detener_servidor(self):
         self.corriendo = False
         if self.servidor_socket:
+            try:
+                self.servidor_socket.shutdown(socket.SHUT_RDWR)
+            except Exception:
+                pass
             try:
                 self.servidor_socket.close()
             except Exception:
@@ -322,6 +375,67 @@ class ChatServer:
         self._log("Servidor detenido.", "sys")
         self.btn_start.config(state=tk.NORMAL)
         self.btn_stop.config(state=tk.DISABLED)
+        self.entry_srv.config(state=tk.DISABLED)
+        self.btn_srv_send.config(state=tk.DISABLED)
+        self.btn_srv_img.config(state=tk.DISABLED)
+
+    # ── Server → clients messaging ────────────────────────────────────────────
+
+    def _enviar_texto(self):
+        if not self.corriendo:
+            return
+        text = self.entry_srv.get().strip()
+        if not text:
+            return
+        self.entry_srv.delete(0, tk.END)
+        self.broadcast("TXT", "Servidor", text.encode("utf-8"))
+        self._log(f"[Servidor]: {text}", "srv")
+
+    def _enviar_imagen(self):
+        if not self.corriendo:
+            return
+        path = filedialog.askopenfilename(
+            title="Seleccionar imagen",
+            filetypes=[("Imágenes", "*.png *.jpg *.jpeg *.gif *.bmp *.webp")]
+        )
+        if not path:
+            return
+        try:
+            with open(path, "rb") as f:
+                img_bytes = f.read()
+        except Exception as e:
+            messagebox.showerror("Error", f"No se pudo leer la imagen:\n{e}")
+            return
+
+        nombre = os.path.basename(path)
+
+        pw = tk.Toplevel(self.root)
+        pw.title("Enviando imagen…")
+        pw.configure(bg=self.BG)
+        pw.geometry("320x90")
+        pw.resizable(False, False)
+        pw.grab_set()
+        tk.Label(pw, text=f"Enviando: {nombre}",
+                 bg=self.BG, fg=self.FG,
+                 font=("Consolas", 10)).pack(pady=(14, 4))
+        pb = ttk.Progressbar(pw, mode="indeterminate", length=280)
+        pb.pack(padx=20)
+        pb.start(12)
+
+        def _send():
+            try:
+                self.broadcast("IMG", nombre, img_bytes)
+                self.root.after(0, lambda: self._log(
+                    f"[Servidor] envió imagen: {nombre}", "img"
+                ))
+            except Exception as e:
+                self.root.after(
+                    0, lambda: messagebox.showerror("Error al enviar", str(e))
+                )
+            finally:
+                self.root.after(0, pw.destroy)
+
+        threading.Thread(target=_send, daemon=True).start()
 
     def _on_close(self):
         if self.corriendo:

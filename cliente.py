@@ -179,29 +179,7 @@ class ChatClient:
         chat_outer = tk.Frame(main, bg=self.BG)
         chat_outer.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        canvas_frame = tk.Frame(chat_outer, bg=self.CHAT_BG)
-        canvas_frame.pack(fill=tk.BOTH, expand=True)
-
-        self.canvas = tk.Canvas(canvas_frame, bg=self.CHAT_BG,
-                                highlightthickness=0)
-        sb = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL,
-                           command=self.canvas.yview)
-        self.canvas.configure(yscrollcommand=sb.set)
-        sb.pack(side=tk.RIGHT, fill=tk.Y)
-        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        self.bubble_frame = tk.Frame(self.canvas, bg=self.CHAT_BG)
-        self._cw = self.canvas.create_window(
-            (0, 0), window=self.bubble_frame, anchor=tk.NW
-        )
-
-        self.bubble_frame.bind("<Configure>", self._on_bubble_cfg)
-        self.canvas.bind("<Configure>", self._on_canvas_cfg)
-        self.canvas.bind_all("<MouseWheel>", self._on_wheel)
-        self.canvas.bind_all("<Button-4>",   self._on_wheel)
-        self.canvas.bind_all("<Button-5>",   self._on_wheel)
-
-        # BOTTOM input bar ────────────────────────────────────────────────────
+        # BOTTOM input bar — packed BEFORE canvas so it isn't squeezed out
         bot = tk.Frame(chat_outer, bg=self.PANEL_BG, height=52)
         bot.pack(side=tk.BOTTOM, fill=tk.X, pady=(4, 0))
         bot.pack_propagate(False)
@@ -233,6 +211,29 @@ class ChatClient:
                             padx=8, pady=10, ipady=5)
         self.entry_msg.bind("<Return>", lambda _e: self._enviar_texto())
         self.entry_msg.focus_set()
+
+        # Canvas + scrollbar — packed after bottom bar so they fill remaining space
+        canvas_frame = tk.Frame(chat_outer, bg=self.CHAT_BG)
+        canvas_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.canvas = tk.Canvas(canvas_frame, bg=self.CHAT_BG,
+                                highlightthickness=0)
+        sb = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL,
+                           command=self.canvas.yview)
+        self.canvas.configure(yscrollcommand=sb.set)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        self.bubble_frame = tk.Frame(self.canvas, bg=self.CHAT_BG)
+        self._cw = self.canvas.create_window(
+            (0, 0), window=self.bubble_frame, anchor=tk.NW
+        )
+
+        self.bubble_frame.bind("<Configure>", self._on_bubble_cfg)
+        self.canvas.bind("<Configure>", self._on_canvas_cfg)
+        self.canvas.bind_all("<MouseWheel>", self._on_wheel)
+        self.canvas.bind_all("<Button-4>",   self._on_wheel)
+        self.canvas.bind_all("<Button-5>",   self._on_wheel)
 
     # ── Canvas resize helpers ─────────────────────────────────────────────────
 

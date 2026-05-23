@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+*.pyo
+imagenes_recibidas_servidor/
+imagenes_recibidas_cliente/
